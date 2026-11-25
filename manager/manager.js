@@ -13,6 +13,13 @@
   var Idb = window.SessionVaultIdb;
   var Backup = window.SessionVaultBackup;
 
+  /* The manager page is also served as a public preview on GitHub Pages,
+   * where the extension APIs do not exist. Detect that up front: in
+   * preview mode the page shows a notice and disables every action that
+   * needs the extension, instead of hanging on "Saving…" forever. */
+  var HAS_EXTENSION = (typeof chrome !== "undefined" && chrome.runtime &&
+    chrome.runtime.sendMessage);
+
   var $ = function (id) { return document.getElementById(id); };
 
   var state = {
@@ -29,8 +36,20 @@
   };
 
   function send(message) {
+    if (!HAS_EXTENSION) {
+      return Promise.resolve({ ok: false, error: "The Session Vault extension is not running on this page." });
+    }
     return new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        resolve({ ok: false, error: "The extension did not answer in time." });
+      }, 30000);
       chrome.runtime.sendMessage(message, function (response) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
         resolve(response || {});
       });
     });
@@ -137,6 +156,7 @@
   }
 
   function maybeShowBackupWarning() {
+    if (!HAS_EXTENSION) { $("backup-warning").hidden = true; return; }
     chrome.storage.local.get("sv.backupWarningDismissedAt", function (r) {
       var dismissedAt = r["sv.backupWarningDismissedAt"] || 0;
       var today = new Date().toDateString();
@@ -490,6 +510,11 @@
   $("import-confirm").addEventListener("click", function () {
     if (importText == null) return;
     send({ type: "importData", text: importText, format: $("import-format").value }).then(function (r) {
+      if (r.error) {
+        $("import-result").textContent = "Import failed: " + r.error;
+        setStatus("Import failed: " + r.error);
+        return;
+      }
       var msg = "Imported " + r.imported + " session(s).";
       if (r.errors && r.errors.length) msg += " Problems: " + r.errors.join(" | ");
       $("import-result").textContent = msg;
@@ -500,7 +525,9 @@
 
   $("backup-pick").addEventListener("click", pickBackupFolder);
   $("backup-dismiss").addEventListener("click", function () {
-    chrome.storage.local.set({ "sv.backupWarningDismissedAt": Date.now() });
+    if (HAS_EXTENSION) {
+      chrome.storage.local.set({ "sv.backupWarningDismissedAt": Date.now() });
+    }
     $("backup-warning").hidden = true;
   });
 
@@ -573,7 +600,7 @@
 
   /* ---------- background broadcasts ---------- */
 
-  chrome.runtime.onMessage.addListener(function (message) {
+  if (HAS_EXTENSION) chrome.runtime.onMessage.addListener(function (message) {
     if (message.type === "autosaved") {
       setStatus("Auto-saved " + message.tabs + " tab(s) · " + fmtClock(message.at) + ".");
       refreshAll();
@@ -587,10 +614,32 @@
 
   /* ---------- boot ---------- */
 
-  send({ type: "verifyNow" }).then(function (r) {
-    state.integrity = r.integrity;
-    return refreshAll();
-  }).then(function () {
-    setStatus("Ready.");
-  });
+  /* Preview mode: the page is served on the open web without the
+   * extension. Show a notice, resolve the badge to "Preview" instead
+   * of leaving it on "Checking…", and disable every action that needs
+   * the extension. Local UI (search, view tabs, dialogs) keeps working. */
+  function enterPreviewMode() {
+    $("preview-banner").hidden = false;
+    var badge = $("integrity-badge");
+    badge.className = "badge badge-unknown";
+    badge.textContent = "Preview";
+    badge.title = "Preview of the library — install the extension to use it.";
+    $("backup-status").textContent = "Backup: not set";
+    ["save-window", "save-all", "empty-save", "export-all-btn", "import-btn"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.disabled = true;
+    });
+    setStatus("Preview — install the Session Vault extension to save and restore sessions.");
+  }
+
+  if (!HAS_EXTENSION) {
+    enterPreviewMode();
+  } else {
+    send({ type: "verifyNow" }).then(function (r) {
+      state.integrity = r.integrity;
+      return refreshAll();
+    }).then(function () {
+      setStatus("Ready.");
+    });
+  }
 })();

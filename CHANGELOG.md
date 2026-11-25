@@ -2,6 +2,12 @@
 
 All notable changes to Session Vault are documented here.
 
+## [1.0.1] - 2026-11-25
+
+- Fixed: the two primary buttons inside the amber banners ("Restore the snapshot", "Pick a backup folder") rendered with white text on a white background, so their labels were invisible until hovered. Banner buttons now keep their blue background.
+- Fixed: the "Recently closed" tab label wrapped onto two lines.
+- The manager page is also served as a public preview on GitHub Pages, where the extension APIs do not exist. It now detects that and shows a clear preview notice, resolves the status badge to "Preview" instead of hanging on "Checking…", and disables the actions that need the extension. Local UI (search, view tabs, dialogs) keeps working. A message to the extension that is never answered now fails after 30 seconds instead of hanging silently.
+
 ## [1.0.0] - 2026-11-25
 
 - First release.
