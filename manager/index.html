@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session Vault</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Session Vault</h1>
+      <p class="muted">Save every tab session. Restore it exactly. Lose nothing.</p>
+    </div>
+    <div class="top-actions">
+      <span id="integrity-badge" class="badge badge-unknown" title="Verifying stored copies…">Checking…</span>
+      <span id="backup-status" class="muted" title="Where the outside copy of your sessions lives">Backup: not set</span>
+      <button id="save-window" title="Save the tabs in the current window as a session">Save this window</button>
+      <button id="save-all" class="primary" title="Save every open window as one session">Save all windows</button>
+    </div>
+  </header>
+
+  <div id="recovery-banner" class="banner banner-amber" hidden>
+    <strong>Chrome closed with tabs that are not open now.</strong>
+    <span id="recovery-text"></span>
+    <span class="banner-actions">
+      <button id="recovery-restore" class="primary">Restore the snapshot</button>
+      <button id="recovery-dismiss" title="Dismiss this recovery offer">Dismiss</button>
+    </span>
+  </div>
+
+  <div id="integrity-alert" class="banner banner-amber" hidden>
+    <strong id="integrity-alert-text"></strong>
+    <span class="banner-actions">
+      <button id="integrity-verify" title="Re-check all three copies now">Verify again</button>
+    </span>
+  </div>
+
+  <div id="backup-warning" class="banner banner-amber" hidden>
+    <span><strong>Backups live in the browser only.</strong> Pick a folder to keep a copy outside it — so a wiped profile can never take your sessions.</span>
+    <span class="banner-actions">
+      <button id="backup-pick" class="primary" title="Choose a folder for dated backup files">Pick a backup folder</button>
+      <button id="backup-dismiss" title="Hide this reminder until tomorrow">Not now</button>
+    </span>
+  </div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <input id="search" type="search" placeholder="Search sessions, titles, URLs  ( / )" aria-label="Search sessions">
+      <div class="list-tabs">
+        <button id="view-sessions" class="list-tab active" title="Show saved sessions">Sessions</button>
+        <button id="view-trash" class="list-tab" title="Show deleted sessions kept for 30 days">Trash</button>
+        <button id="view-closed" class="list-tab" title="Windows and tabs Chrome recently closed">Recently closed</button>
+      </div>
+      <ul id="session-list" class="session-list"></ul>
+      <div class="sidebar-actions">
+        <button id="import-btn" title="Import a Session Vault, OneTab or Tab Session Manager file">Import…</button>
+        <button id="export-all-btn" title="Download all sessions as one JSON file">Export all</button>
+      </div>
+      <p class="muted small">Tab history, scroll position and form contents are not stored — Chrome cannot restore another tab's history.</p>
+    </aside>
+
+    <section class="detail" id="detail">
+      <div id="empty-state" class="empty-state">
+        <h2>No sessions yet</h2>
+        <p>Auto-save is already running: every tab change is captured in the background, so a crash can be recovered from. Save your first session to name it and keep it.</p>
+        <button id="empty-save" class="primary" title="Save every open window as your first session">Save your first session</button>
+      </div>
+
+      <div id="session-detail" hidden>
+        <div class="detail-head">
+          <div>
+            <h2 id="detail-name"></h2>
+            <p id="detail-meta" class="muted"></p>
+          </div>
+          <div class="detail-actions">
+            <button id="rename-btn" title="Rename this session">Rename</button>
+            <button id="export-btn" title="Download this session as a JSON file">Export</button>
+            <button id="delete-btn" class="danger" title="Move this session to the trash (kept 30 days)">Delete</button>
+          </div>
+        </div>
+        <div id="detail-windows"></div>
+        <div class="restore-bar">
+          <button id="restore-btn" class="primary" title="Restore this session — you will confirm the target first">Restore…</button>
+          <span id="restore-hint" class="muted"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="status">Ready.</span>
+    <span id="counts" class="muted"></span>
+  </footer>
+
+  <dialog id="restore-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Restore session</h2>
+      <p id="restore-summary"></p>
+      <label class="field">Restore into
+        <select id="restore-target">
+          <option value="new">New window(s)</option>
+          <option value="current">Current window</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="restore-skip-dupes" checked> Skip tabs that are already open <span id="restore-dupe-count" class="muted"></span></label>
+      <label class="check"><input type="checkbox" id="restore-unloaded" checked> Open tabs unloaded (only the active tab loads)</label>
+      <div id="restore-cannot-open" class="muted small" hidden></div>
+      <div class="dialog-actions">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="restore-confirm" class="primary" value="confirm">Restore</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="rename-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Rename session</h2>
+      <label class="field">Name
+        <input id="rename-input" type="text" maxlength="120">
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button id="rename-confirm" class="primary" value="confirm">Rename</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog" class="dialog">
+    <form method="dialog">
+      <h2>Import sessions</h2>
+      <label class="field">Format
+        <select id="import-format">
+          <option value="vault">Session Vault JSON</option>
+          <option value="onetab">OneTab text export</option>
+          <option value="tsm">Tab Session Manager JSON</option>
+        </select>
+      </label>
+      <label class="field">File
+        <input id="import-file" type="file" accept=".json,.txt">
+      </label>
+      <div id="import-result" class="muted small"></div>
+      <div class="dialog-actions">
+        <button value="cancel" formnovalidate>Close</button>
+        <button id="import-confirm" class="primary" value="confirm" disabled>Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../lib/sessionstore.js"></script>
+  <script src="../lib/idb.js"></script>
+  <script src="../lib/backup.js"></script>
+  <script src="manager.js"></script>
+</body>
+</html>

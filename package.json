@@ -1,0 +1,1 @@
+{"author":"Eslam Salama","description":"Save every tab session. Restore it exactly. Lose nothing.","license":"MIT","name":"session-vault","scripts":{"test":"node --test tests/test_sessionstore.mjs tests/test_restore.mjs"},"version":"1.0.0"}

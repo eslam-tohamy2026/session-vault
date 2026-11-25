@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session Vault</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Session Vault</h1>
+    <p id="last-autosave" class="muted">Auto-save is running.</p>
+  </header>
+  <main>
+    <button id="save-window" class="primary" title="Save the tabs in the current window as a session">Save this window</button>
+    <button id="save-all" title="Save every open window as one session">Save all windows</button>
+    <button id="open-manager" title="Open the session library">Open Session Vault</button>
+    <p id="status" class="muted" role="status"></p>
+  </main>
+  <footer>
+    <p id="integrity" class="muted">Checking copies…</p>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

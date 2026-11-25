@@ -1,0 +1,260 @@
+/* Session Vault — manager page styles.
+ * Same family as the PDF Toolbox and Maker File Previewer: light
+ * theme, system font only, no gradients, no decoration. Accent blue
+ * is used ONLY for the primary action and the active selection;
+ * danger red only for delete; amber only for warnings (a warning
+ * must never look like an error). */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: #1A1A1A;
+  background: #F7F7F8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.muted { color: #6B7280; }
+.small { font-size: 12px; }
+
+button {
+  font: inherit;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #E5E5E8;
+  background: #FFFFFF;
+  color: #1A1A1A;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { border-color: #2563EB; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button.primary { background: #2563EB; border-color: #2563EB; color: #FFFFFF; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: #1D4ED8; }
+button.danger { color: #DC2626; border-color: #FECACA; }
+button.danger:hover:not(:disabled) { border-color: #DC2626; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E5E8;
+}
+
+.topbar h1 { font-size: 18px; margin: 0; }
+.topbar p { margin: 2px 0 0; font-size: 12px; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+
+.badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-ok { background: #DCFCE7; color: #166534; }
+.badge-warn { background: #FEF3C7; color: #92400E; }
+.badge-bad { background: #FEE2E2; color: #991B1B; }
+.badge-unknown { background: #F3F4F6; color: #6B7280; }
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  font-size: 13px;
+}
+.banner-amber { background: #FEF3C7; color: #92400E; border-bottom: 1px solid #FDE68A; }
+.banner-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
+.banner button { background: #FFFFFF; }
+
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  min-height: 0;
+}
+
+.sidebar {
+  border-right: 1px solid #E5E5E8;
+  background: #FFFFFF;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+#search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #E5E5E8;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.list-tabs { display: flex; gap: 4px; }
+.list-tab {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+.list-tab.active { background: #2563EB; color: #FFFFFF; border-color: #2563EB; }
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.session-list li {
+  padding: 10px;
+  border: 1px solid #E5E5E8;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: #FFFFFF;
+}
+
+.session-list li:hover { border-color: #2563EB; }
+.session-list li.selected { border-color: #2563EB; box-shadow: 0 0 0 1px #2563EB; }
+
+.session-list .name { font-weight: 600; word-break: break-word; }
+.session-list .meta { font-size: 12px; color: #6B7280; margin-top: 2px; }
+.source-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 6px;
+  background: #F3F4F6;
+  color: #6B7280;
+}
+.source-badge.manual { background: #DBEAFE; color: #1E40AF; }
+.source-badge.auto { background: #F3F4F6; color: #6B7280; }
+.source-badge.crash { background: #FEF3C7; color: #92400E; }
+
+.sidebar-actions { display: flex; gap: 8px; }
+.sidebar-actions button { flex: 1; }
+
+.detail {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  max-width: 520px;
+  margin: 80px auto;
+  text-align: center;
+  background: #FFFFFF;
+  border: 1px solid #E5E5E8;
+  border-radius: 12px;
+  padding: 32px;
+}
+
+.empty-state h2 { margin-top: 0; }
+
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-head h2 { margin: 0 0 4px; word-break: break-word; }
+.detail-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.window-block {
+  background: #FFFFFF;
+  border: 1px solid #E5E5E8;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+
+.window-block h3 { margin: 0 0 8px; font-size: 13px; color: #6B7280; }
+.window-block h3 .pinned-note { font-weight: 400; }
+
+.tab-list { list-style: none; margin: 0; padding: 0; }
+.tab-list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+.tab-list li:last-child { border-bottom: none; }
+
+.tab-title { word-break: break-all; }
+.tab-url { color: #6B7280; font-size: 12px; word-break: break-all; }
+.tab-pin { color: #2563EB; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.group-chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #DBEAFE;
+  color: #1E40AF;
+  flex-shrink: 0;
+}
+.group-chip.grey { background: #F3F4F6; color: #374151; }
+.group-chip.red { background: #FEE2E2; color: #991B1B; }
+.group-chip.yellow { background: #FEF3C7; color: #92400E; }
+.group-chip.green { background: #DCFCE7; color: #166534; }
+.group-chip.pink { background: #FCE7F3; color: #9D174D; }
+.group-chip.purple { background: #EDE9FE; color: #5B21B6; }
+.group-chip.cyan { background: #CFFAFE; color: #155E75; }
+.group-chip.orange { background: #FFEDD5; color: #9A3412; }
+
+.restore-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 20px;
+  border-top: 1px solid #E5E5E8;
+  background: #FFFFFF;
+  font-size: 12px;
+}
+
+.dialog {
+  border: 1px solid #E5E5E8;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 480px;
+  width: 90%;
+}
+
+.dialog h2 { margin-top: 0; }
+.dialog .field { display: block; margin: 12px 0; }
+.dialog .field input,
+.dialog .field select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid #E5E5E8;
+  border-radius: 8px;
+  font: inherit;
+}
+.dialog .check { display: block; margin: 10px 0; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
