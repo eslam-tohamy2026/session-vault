@@ -159,12 +159,15 @@ async function verifyCopies() {
   if (healed.envelope) {
     if (healed.healed) {
       // Repair the damaged current slot from the previous good one.
-      var rotated = SessionStore.rotateSlots(
+      // repairSlots keeps the OLD previous copy as previous: the
+      // damaged current slot must never be parked there, or the next
+      // failure would heal from a copy already known to be bad.
+      var repaired = SessionStore.repairSlots(
         { current: slots["sv.autosave.current"] || null, previous: slots["sv.autosave.previous"] || null },
         healed.envelope);
       await localSet({
-        "sv.autosave.current": rotated.current,
-        "sv.autosave.previous": rotated.previous,
+        "sv.autosave.current": repaired.current,
+        "sv.autosave.previous": repaired.previous,
       });
       record.status = "healed";
       record.message = "Recovered your sessions from the backup copy — 1 copy was damaged.";
@@ -227,8 +230,12 @@ function indexEntry(session) {
   var urls = [];
   session.windows.forEach(function (w) {
     w.tabs.forEach(function (t) {
-      if (t.title && titles.length < 10) titles.push(t.title);
-      if (t.url && urls.length < 10) urls.push(t.url);
+      // Search covers the whole session, not just the first ten tabs:
+      // the old 10-item cap meant a tab past the tenth could never be
+      // found. 200 entries per session keeps the index small while
+      // covering any session a person actually keeps.
+      if (t.title && titles.length < 200) titles.push(t.title);
+      if (t.url && urls.length < 200) urls.push(t.url);
     });
   });
   return {
@@ -237,6 +244,8 @@ function indexEntry(session) {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     source: session.source,
+    tags: session.tags || [],
+    trashedAt: session.trashedAt || null,
     windowCount: SessionStore.countWindows(session),
     tabCount: SessionStore.countTabs(session),
     titles: titles,
@@ -274,12 +283,18 @@ async function writeDailyBackupIfDue() {
     var settings = await localGet("sv.settings.lastBackupAt");
     var lastBackup = settings["sv.settings.lastBackupAt"] || 0;
     var live = await Idb.getSession(Idb.LIVE_ID);
-    if (!live) return { ok: false, error: "nothing to back up yet" };
-    if (live.updatedAt <= lastBackup) return { ok: true, skipped: true };
     var all = await Idb.listSessions();
     var sessions = all.filter(function (s) {
       return s.id !== Idb.LIVE_ID && s.id.indexOf("__live-gen-") !== 0 && !s.trashedAt;
     });
+    // A manual save counts: the old check compared only the live
+    // snapshot's time, so a day of manual saves could pass with no
+    // file written. And a library with saved sessions but no live
+    // snapshot yet still deserves its first file.
+    if (!SessionStore.needsBackup(sessions, live, lastBackup)) {
+      return { ok: true, skipped: true };
+    }
+    if (!live && !sessions.length) return { ok: false, error: "nothing to back up yet" };
     var json = SessionStore.exportJson(sessions, { live: live });
     var permitted = await Backup.ensurePermission(handle);
     if (!permitted) return { ok: false, error: "backup folder permission revoked — pick the folder again" };
@@ -443,6 +458,34 @@ chrome.runtime.onStartup.addListener(function () {
 
 /* ---------- messages from popup / manager ---------- */
 
+/* Restore any (sub)set of a session: whole, one window, or picked
+ * tabs. The plan is always computed against the tabs open right now,
+ * so duplicates and cannot-open tabs are reported the same way for a
+ * partial restore as for a whole one. */
+async function runRestore(session, options) {
+  var openTabs = await chrome.tabs.query({});
+  var plan = SessionStore.planRestore(session, openTabs.map(function (t) { return t.url; }), {
+    skipDuplicates: options && options.skipDuplicates !== false,
+  });
+  var adapter = chromeAdapter();
+  var currentWindow = null;
+  if (options && options.target === "current") {
+    currentWindow = await chrome.windows.getCurrent();
+  }
+  var result;
+  try {
+    result = await RestoreEngine.executeRestore(adapter, plan, session, {
+      target: options ? options.target : "new",
+      unloaded: options ? options.unloaded !== false : true,
+      currentWindowId: currentWindow ? currentWindow.id : null,
+    });
+  } finally {
+    adapter.dispose();
+  }
+  markDirty();
+  return result;
+}
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   (async function () {
     var type = message && message.type;
@@ -469,11 +512,30 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       await Idb.putSession(toRename);
       await rebuildIndex();
       sendResponse({ session: toRename });
+    } else if (type === "updateSessionMeta") {
+      var toUpdate = await Idb.getSession(message.id);
+      if (!toUpdate) { sendResponse({ error: "session not found" }); return; }
+      if (typeof message.name === "string" && message.name.trim()) {
+        toUpdate.name = message.name.trim();
+      }
+      if (message.tags !== undefined) {
+        toUpdate.tags = SessionStore.cleanTags(message.tags);
+      }
+      toUpdate.updatedAt = Date.now();
+      await Idb.putSession(toUpdate);
+      await rebuildIndex();
+      sendResponse({ session: toUpdate });
     } else if (type === "deleteSession") {
       var toDelete = await Idb.getSession(message.id);
       if (!toDelete) { sendResponse({ error: "session not found" }); return; }
       toDelete.trashedAt = Date.now();
       await Idb.putSession(toDelete);
+      await rebuildIndex();
+      sendResponse({ ok: true });
+    } else if (type === "deleteSessionForever") {
+      var gone = await Idb.getSession(message.id);
+      if (!gone) { sendResponse({ error: "session not found" }); return; }
+      await Idb.deleteSession(message.id);
       await rebuildIndex();
       sendResponse({ ok: true });
     } else if (type === "listTrash") {
@@ -492,12 +554,31 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     } else if (type === "purgeTrash") {
       await pruneTrash();
       sendResponse({ ok: true });
+    } else if (type === "emptyTrash") {
+      var trashed = await Idb.listSessions();
+      var count = 0;
+      for (var ti = 0; ti < trashed.length; ti++) {
+        if (trashed[ti].trashedAt) {
+          await Idb.deleteSession(trashed[ti].id);
+          count += 1;
+        }
+      }
+      sendResponse({ ok: true, deleted: count });
     } else if (type === "previewRestore") {
       var previewTarget = await Idb.getSession(message.id);
       if (!previewTarget) { sendResponse({ error: "session not found" }); return; }
+      // A window or a ticked selection previews exactly what it would
+      // restore — same plan, same counts, computed against the tabs
+      // open right now.
+      var previewSession = previewTarget;
+      if (message.windowIndex != null) {
+        previewSession = SessionStore.selectWindow(previewTarget, message.windowIndex) || previewTarget;
+      } else if (message.picks) {
+        previewSession = SessionStore.selectTabs(previewTarget, message.picks) || previewTarget;
+      }
       var openForPreview = await chrome.tabs.query({});
       var previewPlan = SessionStore.planRestore(
-        previewTarget, openForPreview.map(function (t) { return t.url; }), { skipDuplicates: true });
+        previewSession, openForPreview.map(function (t) { return t.url; }), { skipDuplicates: true });
       sendResponse({
         toOpen: previewPlan.toOpen,
         skipped: previewPlan.skipped,
@@ -506,31 +587,35 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     } else if (type === "restoreSession") {
       var target = await Idb.getSession(message.id);
       if (!target) { sendResponse({ error: "session not found" }); return; }
-      var openTabs = await chrome.tabs.query({});
-      var plan = SessionStore.planRestore(target, openTabs.map(function (t) { return t.url; }), {
-        skipDuplicates: message.options ? message.options.skipDuplicates !== false : true,
-      });
-      var adapter = chromeAdapter();
-      var currentWindow = null;
-      if (message.options && message.options.target === "current") {
-        currentWindow = await chrome.windows.getCurrent();
-      }
-      var result;
-      try {
-        result = await RestoreEngine.executeRestore(adapter, plan, target, {
-          target: message.options ? message.options.target : "new",
-          unloaded: message.options ? message.options.unloaded !== false : true,
-          currentWindowId: currentWindow ? currentWindow.id : null,
-        });
-      } finally {
-        adapter.dispose();
-      }
-      markDirty();
-      sendResponse({ result: result });
+      sendResponse({ result: await runRestore(target, message.options) });
+    } else if (type === "restoreWindow") {
+      var windowTarget = await Idb.getSession(message.id);
+      if (!windowTarget) { sendResponse({ error: "session not found" }); return; }
+      var oneWindow = SessionStore.selectWindow(windowTarget, message.windowIndex);
+      if (!oneWindow) { sendResponse({ error: "window not found in session" }); return; }
+      sendResponse({ result: await runRestore(oneWindow, message.options) });
+    } else if (type === "restoreSelection") {
+      var selTarget = await Idb.getSession(message.id);
+      if (!selTarget) { sendResponse({ error: "session not found" }); return; }
+      var subset = SessionStore.selectTabs(selTarget, message.picks);
+      if (!subset) { sendResponse({ error: "no tabs selected" }); return; }
+      sendResponse({ result: await runRestore(subset, message.options) });
     } else if (type === "exportSession") {
       var one = await Idb.getSession(message.id);
       if (!one) { sendResponse({ error: "session not found" }); return; }
       sendResponse({ json: SessionStore.exportJson([one]) });
+    } else if (type === "exportSessionText") {
+      var oneText = await Idb.getSession(message.id);
+      if (!oneText) { sendResponse({ error: "session not found" }); return; }
+      var lines = ["# " + oneText.name, ""];
+      oneText.windows.forEach(function (w, wi) {
+        lines.push("## Window " + (wi + 1) + (w.incognito ? " (incognito)" : ""));
+        w.tabs.forEach(function (t) {
+          lines.push((t.title ? t.title + " | " : "") + t.url);
+        });
+        lines.push("");
+      });
+      sendResponse({ text: lines.join("\n") });
     } else if (type === "exportAll") {
       var allSessions = await Idb.listSessions();
       var kept = allSessions.filter(function (s) {
@@ -544,11 +629,18 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         : message.format === "tsm"
           ? SessionStore.importTabSessionManagerJson(message.text)
           : SessionStore.importJson(message.text);
-      for (var i = 0; i < imported.sessions.length; i++) {
-        await Idb.putSession(imported.sessions[i]);
+      // Re-importing the same file must not duplicate sessions, and a
+      // foreign file must never silently overwrite a different session
+      // that happens to share an id.
+      var existing = (await Idb.listSessions()).filter(function (s) {
+        return s.id !== Idb.LIVE_ID && s.id.indexOf("__live-gen-") !== 0 && !s.trashedAt;
+      });
+      var resolved = SessionStore.resolveImport(existing, imported.sessions);
+      for (var i = 0; i < resolved.save.length; i++) {
+        await Idb.putSession(resolved.save[i]);
       }
-      if (imported.sessions.length) await rebuildIndex();
-      sendResponse({ imported: imported.sessions.length, errors: imported.errors });
+      if (resolved.save.length) await rebuildIndex();
+      sendResponse({ imported: resolved.save.length, skipped: resolved.skipped, errors: imported.errors });
     } else if (type === "getIntegrity") {
       var integrity = await localGet("sv.integrity");
       sendResponse({ integrity: integrity["sv.integrity"] || null });
@@ -590,17 +682,12 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
       markDirty();
       sendResponse({ result: liveResult });
     } else if (type === "getBackupStatus") {
-      var hasHandle = !!(await Idb.getMeta("backupHandle"));
+      var handle = await Idb.getMeta("backupHandle");
       var backupSettings = await localGet(["sv.settings.lastBackupAt", "sv.settings.backupError"]);
-      var folderName = null;
-      try {
-        var handle = await Idb.getMeta("backupHandle");
-        folderName = handle ? handle.name : null;
-      } catch (e) { /* no handle */ }
       sendResponse({
         supported: Backup.isSupported(),
-        hasFolder: hasHandle,
-        folderName: folderName,
+        hasFolder: !!handle,
+        folderName: handle ? handle.name : null,
         lastBackupAt: backupSettings["sv.settings.lastBackupAt"] || null,
         error: backupSettings["sv.settings.backupError"] || null,
       });

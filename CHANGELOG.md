@@ -2,6 +2,37 @@
 
 All notable changes to Session Vault are documented here.
 
+## [2.0.0] - 2026-11-28
+
+A major release: restore is now granular, the library is organisable, and four real defects are fixed. Nothing about storage changed — v1 sessions, trash and backups load exactly as before; no migration is needed.
+
+### Added
+
+- Restore a whole session, one window, just the tabs you tick, or a single tab — every variant goes through the same confirmation dialog and the same honest preview (how many tabs will open, how many are already open, which ones cannot be opened and why).
+- Tags on sessions (up to 10, set in the Rename dialog), with one-click tag filtering in the sidebar.
+- Sorting: newest, oldest, name A–Z, most tabs first.
+- Trash that works: restore a deleted session from the Trash tab, delete one forever, or empty the whole trash in one click (with confirmation).
+- Export a session as a plain-text list of links, alongside the JSON export.
+- Search now covers the whole session — names, tags, tab titles and URLs — instead of only the first ten tabs.
+- The public preview on GitHub Pages now shows three labelled sample sessions and opens the first one, so visitors see the library instead of an empty page.
+- Real screenshots of the manager and popup in `docs/screenshots/`, rendered with headless Chromium (`docs/screenshots/take-screenshots.py` reproduces them).
+
+### Fixed
+
+- Self-healing no longer parks the damaged mirror slot as the fallback: after a heal, the previous slot keeps the copy that just proved itself good. Before, a second failure could have healed from a copy already known to be bad.
+- The daily file backup no longer misses manual saves: it is written whenever anything changed (any session or the live snapshot), and a library with saved sessions but no live snapshot yet still gets its first file.
+- Trash entries showed the wrong date (the original save date, labelled "Deleted"). They now show the actual deletion time.
+- Pressing Enter in the Rename dialog cancelled instead of saving: Cancel was the first submit button in the dialog. Cancel buttons are now `type="button"` and the confirm buttons are the submit buttons in all three dialogs.
+- Hidden banners and bars were visible anyway: `.banner` and `.restore-bar` set `display: flex`, which overrides the browser's built-in `[hidden]` rule — so the recovery banner, an empty integrity alert and the trash bar all showed in the preview even when hidden. The stylesheet now forces `[hidden]` off. (Found by the v2 screenshot review; the bug existed in v1.)
+- Importing the same file twice no longer duplicates sessions, and a foreign file can no longer silently overwrite a different session that shares an id — it is saved under a fresh id instead.
+- The backup-folder flow no longer writes the daily file twice when a folder is picked.
+- Corrected the Tab Session Manager import note: its export does not carry group titles in a mappable form, so imported tabs arrive ungrouped rather than wrongly grouped.
+
+### Changed
+
+- Version 2.0.0: the restore granularity, tags, sorting and trash work are a significant new surface, and the healed-mirror and backup fixes change behaviour users can notice — a major bump, not a patch.
+- README rewritten with real screenshots, an honest comparison table against Session Buddy 4.1.2, Tab Session Manager 7.4 and Workona (figures read November 2026), and a plain statement of what Session Vault deliberately does not do.
+
 ## [1.0.1] - 2026-11-25
 
 - Fixed: the two primary buttons inside the amber banners ("Restore the snapshot", "Pick a backup folder") rendered with white text on a white background, so their labels were invisible until hovered. Banner buttons now keep their blue background.

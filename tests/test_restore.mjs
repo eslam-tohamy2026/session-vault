@@ -310,3 +310,30 @@ test("duplicates are skipped when already open, counted in the result", async ()
   assert.equal(result.skipped, 2);
   assert.equal(result.restored, 5);
 });
+
+test("v2: restoring one window restores only that window's tabs", async () => {
+  const fake = new FakeChrome();
+  const session = fixtureSession();
+  const oneWindow = SessionStore.selectWindow(session, 1);
+  const plan = SessionStore.planRestore(oneWindow, [], { skipDuplicates: true });
+  const result = await restoreWithUrls(fake, plan, oneWindow, { unloaded: false });
+  assert.equal(result.restored, 3);
+  assert.equal(fake.calls.windowsCreate.length, 1);
+  assert.equal(fake.calls.tabsGroup.length, 1); // only the Docs group
+  assert.ok(fake.calls.tabGroupsUpdate.some((c) => c.props.title === "Docs"));
+});
+
+test("v2: restoring ticked tabs restores only those, groups pruned", async () => {
+  const fake = new FakeChrome();
+  const session = fixtureSession();
+  const subset = SessionStore.selectTabs(session, [
+    { window: 0, tab: 2 }, { window: 0, tab: 3 }, { window: 1, tab: 2 },
+  ]);
+  const plan = SessionStore.planRestore(subset, [], { skipDuplicates: true });
+  const result = await restoreWithUrls(fake, plan, subset, { unloaded: false });
+  assert.equal(result.restored, 3);
+  assert.equal(fake.calls.windowsCreate.length, 2);
+  // The Research group kept one member; Docs lost every member.
+  assert.equal(fake.calls.tabsGroup.length, 1);
+  assert.ok(fake.calls.tabGroupsUpdate.some((c) => c.props.title === "Research"));
+});

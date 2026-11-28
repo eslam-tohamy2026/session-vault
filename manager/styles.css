@@ -7,6 +7,12 @@
 
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute must actually hide things: several components
+ * below set display:flex/block, which would otherwise override the
+ * browser's built-in [hidden] rule and leave empty banners and bars
+ * visible (caught by the v2 screenshot review). */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -72,6 +78,7 @@ button.danger:hover:not(:disabled) { border-color: #DC2626; }
   font-size: 13px;
 }
 .banner-amber { background: #FEF3C7; color: #92400E; border-bottom: 1px solid #FDE68A; }
+.banner-blue { background: #DBEAFE; color: #1E40AF; border-bottom: 1px solid #BFDBFE; }
 .banner-actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; }
 .banner button:not(.primary) { background: #FFFFFF; }
 
@@ -99,6 +106,33 @@ button.danger:hover:not(:disabled) { border-color: #DC2626; }
   border-radius: 8px;
   font: inherit;
 }
+
+.list-controls { display: flex; gap: 8px; }
+.list-controls select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #E5E5E8;
+  border-radius: 8px;
+  font: inherit;
+  background: #FFFFFF;
+  color: #1A1A1A;
+}
+
+.tag-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #E5E5E8;
+  background: #FFFFFF;
+  color: #374151;
+  cursor: pointer;
+}
+.tag-chip:hover:not(.tag-static) { border-color: #2563EB; color: #1E40AF; }
+.tag-chip.active { background: #2563EB; border-color: #2563EB; color: #FFFFFF; }
+.tag-chip.tag-static { cursor: default; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 
 .list-tabs { display: flex; gap: 4px; }
 .list-tab {
@@ -148,6 +182,7 @@ button.danger:hover:not(:disabled) { border-color: #DC2626; }
 
 .sidebar-actions { display: flex; gap: 8px; }
 .sidebar-actions button { flex: 1; }
+#empty-trash-btn { width: 100%; }
 
 .detail {
   padding: 20px;
@@ -185,8 +220,27 @@ button.danger:hover:not(:disabled) { border-color: #DC2626; }
   padding: 12px 14px;
 }
 
-.window-block h3 { margin: 0 0 8px; font-size: 13px; color: #6B7280; }
-.window-block h3 .pinned-note { font-weight: 400; }
+.window-block h3 { margin: 0; font-size: 13px; color: #6B7280; }
+.window-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.window-head h3 .pinned-note { font-weight: 400; }
+.window-restore {
+  padding: 4px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.tab-check { flex-shrink: 0; width: 15px; height: 15px; accent-color: #2563EB; cursor: pointer; }
+.tab-open {
+  padding: 2px 8px;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
 
 .tab-list { list-style: none; margin: 0; padding: 0; }
 .tab-list li {

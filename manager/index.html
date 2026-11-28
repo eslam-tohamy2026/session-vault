@@ -23,6 +23,10 @@
     <span><strong>This is a preview.</strong> The library needs the Session Vault extension to save, restore and verify sessions — install the extension to use it.</span>
   </div>
 
+  <div id="sample-banner" class="banner banner-blue" hidden>
+    <span><strong>Sample sessions.</strong> These three sessions are examples so you can see the library — they are not your tabs, and nothing here is saved.</span>
+  </div>
+
   <div id="recovery-banner" class="banner banner-amber" hidden>
     <strong>Chrome closed with tabs that are not open now.</strong>
     <span id="recovery-text"></span>
@@ -50,6 +54,15 @@
   <main class="layout">
     <aside class="sidebar">
       <input id="search" type="search" placeholder="Search sessions, titles, URLs  ( / )" aria-label="Search sessions">
+      <div class="list-controls">
+        <select id="sort" aria-label="Sort sessions" title="Sort sessions">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name">Name A–Z</option>
+          <option value="tabs">Most tabs first</option>
+        </select>
+      </div>
+      <div id="tag-filter" class="tag-filter" hidden></div>
       <div class="list-tabs">
         <button id="view-sessions" class="list-tab active" title="Show saved sessions">Sessions</button>
         <button id="view-trash" class="list-tab" title="Show deleted sessions kept for 30 days">Trash</button>
@@ -60,6 +73,7 @@
         <button id="import-btn" title="Import a Session Vault, OneTab or Tab Session Manager file">Import…</button>
         <button id="export-all-btn" title="Download all sessions as one JSON file">Export all</button>
       </div>
+      <button id="empty-trash-btn" class="danger" hidden title="Permanently delete everything in the trash">Empty trash</button>
       <p class="muted small">Tab history, scroll position and form contents are not stored — Chrome cannot restore another tab's history.</p>
     </aside>
 
@@ -75,17 +89,25 @@
           <div>
             <h2 id="detail-name"></h2>
             <p id="detail-meta" class="muted"></p>
+            <div id="detail-tags" class="tag-row"></div>
           </div>
           <div class="detail-actions">
-            <button id="rename-btn" title="Rename this session">Rename</button>
+            <button id="rename-btn" title="Rename this session or edit its tags">Rename</button>
             <button id="export-btn" title="Download this session as a JSON file">Export</button>
+            <button id="export-text-btn" title="Download this session as a plain list of links">Export as text</button>
             <button id="delete-btn" class="danger" title="Move this session to the trash (kept 30 days)">Delete</button>
           </div>
         </div>
         <div id="detail-windows"></div>
-        <div class="restore-bar">
+        <div class="restore-bar" id="restore-bar">
           <button id="restore-btn" class="primary" title="Restore this session — you will confirm the target first">Restore…</button>
+          <button id="restore-selected-btn" class="primary" hidden title="Restore only the tabs you ticked">Restore selected</button>
           <span id="restore-hint" class="muted"></span>
+        </div>
+        <div class="restore-bar" id="trash-bar" hidden>
+          <button id="trash-restore-btn" class="primary" title="Move this session back to the library">Restore session</button>
+          <button id="trash-delete-btn" class="danger" title="Permanently delete this session now">Delete forever</button>
+          <span class="muted">Deleted sessions are kept 30 days, then removed automatically.</span>
         </div>
       </div>
     </section>
@@ -110,8 +132,8 @@
       <label class="check"><input type="checkbox" id="restore-unloaded" checked> Open tabs unloaded (only the active tab loads)</label>
       <div id="restore-cannot-open" class="muted small" hidden></div>
       <div class="dialog-actions">
-        <button value="cancel" formnovalidate>Cancel</button>
-        <button id="restore-confirm" class="primary" value="confirm">Restore</button>
+        <button type="button" id="restore-cancel" value="cancel" formnovalidate>Cancel</button>
+        <button type="submit" id="restore-confirm" class="primary" value="confirm">Restore</button>
       </div>
     </form>
   </dialog>
@@ -122,9 +144,12 @@
       <label class="field">Name
         <input id="rename-input" type="text" maxlength="120">
       </label>
+      <label class="field">Tags <span class="muted small">(comma-separated, up to 10 — e.g. work, research)</span>
+        <input id="rename-tags" type="text" maxlength="200" placeholder="work, research">
+      </label>
       <div class="dialog-actions">
-        <button value="cancel" formnovalidate>Cancel</button>
-        <button id="rename-confirm" class="primary" value="confirm">Rename</button>
+        <button type="button" id="rename-cancel" value="cancel" formnovalidate>Cancel</button>
+        <button type="submit" id="rename-confirm" class="primary" value="confirm">Save</button>
       </div>
     </form>
   </dialog>
@@ -144,8 +169,8 @@
       </label>
       <div id="import-result" class="muted small"></div>
       <div class="dialog-actions">
-        <button value="cancel" formnovalidate>Close</button>
-        <button id="import-confirm" class="primary" value="confirm" disabled>Import</button>
+        <button type="button" id="import-cancel" value="cancel" formnovalidate>Close</button>
+        <button type="submit" id="import-confirm" class="primary" value="confirm" disabled>Import</button>
       </div>
     </form>
   </dialog>
